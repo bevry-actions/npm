@@ -1,0 +1,31 @@
+# https://docs.github.com/en/free-pro-team@latest/actions/creating-actions/metadata-syntax-for-github-actions
+name: "bevry-actions/npm"
+author: "Benjamin Arthur Lupton <b@lupton.cc>"
+description: "GitHub Action to publish your project to npm"
+branding:
+  icon: "package"
+  color: "red"
+
+# https://docs.github.com/en/free-pro-team@latest/actions/creating-actions/metadata-syntax-for-github-actions#inputs
+inputs:
+  npmAuthToken:
+    description: "Specify the token to authorize the publishing of releases to npm."
+    required: true
+  npmBranchTag:
+    description: "If you wish for each new commit to particular branch to be published to a particular npm tag, then specify it like so `branch:tag`, e.g. `main:next`."
+    required: false
+  bevryCDNToken:
+    description: "If you wish to map your npm release to the Bevry CDN, then provide your Bevry CDN token."
+    required: false
+
+# https://docs.github.com/en/free-pro-team@latest/actions/creating-actions/metadata-syntax-for-github-actions#runs-for-composite-run-steps-actions
+runs:
+  using: "composite"
+  steps:
+    - run: $GITHUB_ACTION_PATH/action.bash
+      shell: bash
+      env:
+        GH_EVENT_NAME: ${{github.event_name}}
+        NPM_AUTH_TOKEN: ${{inputs.npmAuthToken}}
+        NPM_BRANCH_TAG: ${{inputs.npmBranchTag}}
+        BEVRY_CDN_TOKEN: ${{inputs.bevryCDNToken}}
