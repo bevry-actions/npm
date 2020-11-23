@@ -14,7 +14,9 @@ set -ueE -o pipefail
 # MANUAL GITHUB CONTEXT VARIABLES
 # https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions
 
-# GH_EVENT_NAME: ${{github.event_name}}
+# GH_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+# GH_MASTER_BRANCH: ${{ github.event.repository.master_branch }}
+# GH_EVENT_NAME: ${{ github.event_name }}
 
 # =====================================
 # MANUAL ENVIRONMENT VARIABLES
@@ -71,6 +73,11 @@ echo "logged into npm as: $(npm whoami)"
 # check if we wish to tag the current branch
 if test -n "${NPM_BRANCH_TAG:-}"; then
 	branch="${NPM_BRANCH_TAG%:*}"
+	if test -z "$branch" -o "$branch" = "default"; then
+		branch="${GH_DEFAULT_BRANCH}"
+	elif test "$branch" = "master"; then
+		branch="${GH_MASTER_BRANCH}"
+	fi
 	if test "$branch" = "$REPO_BRANCH"; then
 		tag="${NPM_BRANCH_TAG#*:}"
 	fi
