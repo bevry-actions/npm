@@ -91,7 +91,11 @@ if test -n "${REPO_TAG-}" -o -n "${tag-}"; then
 		next="${version%-*}-${tag}.${time}.${REPO_SHA}"  # version trims anything after -
 		npm version "${next}" --git-tag-version=false
 		echo "publishing branch ${branch} to tag ${tag} with version ${next}..."
-		npm publish --access public --tag "${tag}"
+		npm publish --access public --tag "${tag}" || {
+			echo "trying again in 60s..."
+   			sleep 60
+  			npm publish --access public --tag "${tag}"
+     		}
 
 	# publish package.json
 	else
@@ -128,7 +132,11 @@ if test -n "${BEVRY_CDN_TOKEN-}"; then
 	npm version "${cdn}" --git-tag-version=false
 
 	echo "publishing to tag ${tag} with version ${cdn}..."
-	npm publish --access public --tag "${tag}"
+	npm publish --access public --tag "${tag}" || {
+		echo "trying again in 60s..."
+		sleep 60
+		npm publish --access public --tag "${tag}"
+	}
 
 	echo "adding cdn aliases..."
 	packageName="$(node -e "process.stdout.write(require('./package.json').name)")"
