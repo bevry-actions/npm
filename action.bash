@@ -81,7 +81,12 @@ if test -n "${NPM_BRANCH_TAG:-}"; then
 fi
 
 if test -n "${REPO_TAG-}" -o -n "${tag-}"; then
-	echo "releasing to npm..."
+	# wait up to 60 seconds to prevent a conflict between a tag release and the next release
+ 	# npm ERR! 409 Conflict - Failed to save packument. A common cause is if you try to publish a new package before the previous package has been fully processed.
+ 	# https://github.com/bevry/trim-empty-keys/actions/runs/7299137279/job/19891492043
+	delay="$((RANDOM%60))"
+	echo "releasing to npm after ${delay} seconds..."
+ 	sleep "$delay"
 
 	# not repo tag, is branch tag
 	if test -z "${REPO_TAG-}" -a -n "${tag-}"; then
@@ -91,11 +96,7 @@ if test -n "${REPO_TAG-}" -o -n "${tag-}"; then
 		next="${version%-*}-${tag}.${time}.${REPO_SHA}"  # version trims anything after -
 		npm version "${next}" --git-tag-version=false
 		echo "publishing branch ${branch} to tag ${tag} with version ${next}..."
-		npm publish --access public --tag "${tag}" || {
-			echo "trying again in 60s..."
-   			sleep 60
-  			npm publish --access public --tag "${tag}"
-     		}
+		npm publish --access public --tag "${tag}"
 
 	# publish package.json
 	else
