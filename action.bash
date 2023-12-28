@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ueE -o pipefail
+set -Eeuo pipefail
 
 # =====================================
 # AUTOMATIC GITHUB ENVIRONMENT VARIABLES
@@ -54,22 +54,22 @@ fi
 function npm_publish {
 	local delay status
  	while true; do
- 		delay="$((RANDOM%60))"
+	delay="$((RANDOM%60))"
 		echo "waiting ${delay} seconds..."
- 		sleep "$delay"
+		sleep "$delay"
 		status=0 && npm publish "$@" || status=$?
 		if test "$status" -eq 0; then
-  			echo "npm publish successful"
-     			break
-     		elif test "$status" -eq 409; then
-       			echo "npm publish failed with conflict, trying again..."
-	  		continue
+			echo "npm publish successful"
+			break
+		elif test "$status" -eq 409; then
+			echo "npm publish failed with conflict, trying again..."
+			continue
 		else
-  			echo "npm publish failed with exit status: $status"
-  			return "$status"
-     		fi
-       done
-       return 0
+			echo "npm publish failed with exit status: $status"
+			return "$status"
+		fi
+	done
+	return 0
 }
 
 # =====================================
