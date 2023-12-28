@@ -55,7 +55,7 @@ function npm_publish {
  	delay="$((RANDOM%60))"
 	echo "waiting ${delay} seconds..."
  	sleep "$delay"
-	npm publish "$@" || status=$?
+	status=0 && npm publish "$@" || status=$?
 	if test "$?" -eq 429; then
 		npm_publish "$@"
 	fi
