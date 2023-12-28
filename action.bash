@@ -45,6 +45,24 @@ else
 fi
 
 # =====================================
+# HELPERS
+
+# workaround:
+# https://github.com/bevry/trim-empty-keys/actions/runs/7299137279/job/19891492043
+# https://github.com/bevry/oneday/actions/runs/7338411137/job/19980941727
+function npm_publish {
+	local delay status
+ 	delay="$((RANDOM%60))"
+	echo "waiting ${delay} seconds..."
+ 	sleep "$delay"
+	npm publish "$@" || status=$?
+	if test "$?" -eq 429; then
+		npm_publish "$@"
+	fi
+	return "$status"
+}
+
+# =====================================
 # CHECKS
 
 if [[ "$REPO_BRANCH" = *"dependabot"* ]]; then
@@ -81,12 +99,7 @@ if test -n "${NPM_BRANCH_TAG:-}"; then
 fi
 
 if test -n "${REPO_TAG-}" -o -n "${tag-}"; then
-	# wait up to 60 seconds to prevent a conflict between a tag release and the next release
- 	# npm ERR! 409 Conflict - Failed to save packument. A common cause is if you try to publish a new package before the previous package has been fully processed.
- 	# https://github.com/bevry/trim-empty-keys/actions/runs/7299137279/job/19891492043
-	delay="$((RANDOM%60))"
-	echo "releasing to npm after ${delay} seconds..."
- 	sleep "$delay"
+	echo 'releasing to npm...'
 
 	# not repo tag, is branch tag
 	if test -z "${REPO_TAG-}" -a -n "${tag-}"; then
@@ -96,12 +109,12 @@ if test -n "${REPO_TAG-}" -o -n "${tag-}"; then
 		next="${version%-*}-${tag}.${time}.${REPO_SHA}"  # version trims anything after -
 		npm version "${next}" --git-tag-version=false
 		echo "publishing branch ${branch} to tag ${tag} with version ${next}..."
-		npm publish --access public --tag "${tag}"
+		npm_publish --access public --tag "${tag}"
 
 	# publish package.json
 	else
 		echo "publishing the local package.json version..."
-		npm publish --access public
+		npm_publish --access public
 	fi
 
 	echo "...released to npm"
@@ -133,11 +146,7 @@ if test -n "${BEVRY_CDN_TOKEN-}"; then
 	npm version "${cdn}" --git-tag-version=false
 
 	echo "publishing to tag ${tag} with version ${cdn}..."
-	npm publish --access public --tag "${tag}" || {
-		echo "trying again in 60s..."
-		sleep 60
-		npm publish --access public --tag "${tag}"
-	}
+	npm_publish --access public --tag "${tag}"
 
 	echo "adding cdn aliases..."
 	packageName="$(node -e "process.stdout.write(require('./package.json').name)")"
