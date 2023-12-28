@@ -50,16 +50,26 @@ fi
 # workaround:
 # https://github.com/bevry/trim-empty-keys/actions/runs/7299137279/job/19891492043
 # https://github.com/bevry/oneday/actions/runs/7338411137/job/19980941727
+# https://github.com/bevry/typechecker/actions/runs/7349089133/job/20008437623
 function npm_publish {
 	local delay status
- 	delay="$((RANDOM%60))"
-	echo "waiting ${delay} seconds..."
- 	sleep "$delay"
-	status=0 && npm publish "$@" || status=$?
-	if test "$?" -eq 429; then
-		npm_publish "$@"
-	fi
-	return "$status"
+ 	while true; do
+ 		delay="$((RANDOM%60))"
+		echo "waiting ${delay} seconds..."
+ 		sleep "$delay"
+		status=0 && npm publish "$@" || status=$?
+		if test "$status" -eq 0; then
+  			echo "npm publish successful"
+     			break
+     		elif test "$status" -eq 409; then
+       			echo "npm publish failed with conflict, trying again..."
+	  		continue
+		else
+  			echo "npm publish failed with exit status: $status"
+  			return "$status"
+     		fi
+       done
+       return 0
 }
 
 # =====================================
