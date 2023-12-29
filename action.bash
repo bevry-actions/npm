@@ -34,9 +34,9 @@ REPO_NAME="${REPO_SLUG#*/}"
 REPO_TAG=""
 REPO_BRANCH=""
 REPO_COMMIT=""
-if [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
+if [[ $GITHUB_REF == "refs/tags/"* ]]; then
 	REPO_TAG="${GITHUB_REF#"refs/tags/"}"
-elif [[ "$GITHUB_REF" == "refs/heads/"* ]]; then
+elif [[ $GITHUB_REF == "refs/heads/"* ]]; then
 	REPO_BRANCH="${GITHUB_REF#"refs/heads/"}"
 	REPO_COMMIT="$GITHUB_SHA"
 else
@@ -52,34 +52,34 @@ fi
 # https://github.com/bevry/oneday/actions/runs/7338411137/job/19980941727
 # https://github.com/bevry/typechecker/actions/runs/7349089133/job/20008437623
 function npm_publish {
-	local delay status
- 	while true; do
-	delay="$((RANDOM%60))"
+	local delay status stderr
+	while true; do
+		stderr="$(mktemp)"
+		delay="$((RANDOM % 60))"
 		echo "waiting ${delay} seconds..."
 		sleep "$delay"
-		status=0 && npm publish "$@" || status=$?
+		status=0 && npm publish "$@" 2> >(tee "$stderr" >/dev/stderr) || status=$?
 		if test "$status" -eq 0; then
-			echo "npm publish successful"
-			break
-		elif test "$status" -eq 409; then
-			echo "npm publish failed with conflict, trying again..."
+			echo 'npm publish successful'
+			return 0
+		elif test "$status" -eq 409 || grep --quiet --fixed-strings --regexp='code E409' "$stderr"; then
+			echo 'npm publish failed with E409 Conflict, trying again...'
 			continue
 		else
 			echo "npm publish failed with exit status: $status"
 			return "$status"
 		fi
 	done
-	return 0
 }
 
 # =====================================
 # CHECKS
 
-if [[ "$REPO_BRANCH" = *"dependabot"* ]]; then
-	echo "skipping as running on a dependabot branch"
+if [[ $REPO_BRANCH == *"dependabot"* ]]; then
+	echo 'skipping as running on a dependabot branch'
 	exit 0
 elif test -z "$NPM_AUTH_TOKEN"; then
-	echo "you must provide NPM_AUTH_TOKEN"
+	echo 'you must provide NPM_AUTH_TOKEN'
 	exit 1
 fi
 
@@ -92,15 +92,15 @@ fi
 # # https://github.com/bevry/es-versions/runs/1378842251?check_suite_focus=true#step:7:39
 # # https://github.com/bevry/es-versions/runs/1378917476?check_suite_focus=true#step:7:40
 # # hence the need for the following login code below
-echo "creating npmrc with npm auth token..."
-echo "//registry.npmjs.org/:_authToken=$NPM_AUTH_TOKEN" > "$HOME/.npmrc"
+echo 'creating npmrc with npm auth token...'
+echo "//registry.npmjs.org/:_authToken=$NPM_AUTH_TOKEN" >"$HOME/.npmrc"
 echo "logged into npm as: $(npm whoami)"
 
 # @todo simplify this, and consider making it only run on the default branch
 # check if we wish to tag the current branch
 if test -n "${NPM_BRANCH_TAG:-}"; then
 	branch="${NPM_BRANCH_TAG%:*}"
-	if test -z "$branch" -o "$branch" = "master"; then
+	if test -z "$branch" -o "$branch" = 'master'; then
 		branch="${GH_MASTER_BRANCH}"
 	fi
 	if test "$branch" = "$REPO_BRANCH"; then
@@ -113,23 +113,23 @@ if test -n "${REPO_TAG-}" -o -n "${tag-}"; then
 
 	# not repo tag, is branch tag
 	if test -z "${REPO_TAG-}" -a -n "${tag-}"; then
-		echo "bumping the npm version..."
+		echo 'bumping the npm version...'
 		version="$(node -e "console.log(require('./package.json').version)")"
 		time="$(date +%s)"
-		next="${version%-*}-${tag}.${time}.${REPO_SHA}"  # version trims anything after -
+		next="${version%-*}-${tag}.${time}.${REPO_SHA}" # version trims anything after -
 		npm version "${next}" --git-tag-version=false
 		echo "publishing branch ${branch} to tag ${tag} with version ${next}..."
 		npm_publish --access public --tag "${tag}"
 
 	# publish package.json
 	else
-		echo "publishing the local package.json version..."
+		echo 'publishing the local package.json version...'
 		npm_publish --access public
 	fi
 
-	echo "...released to npm"
+	echo '...released to npm'
 else
-	echo "no need for release to npm"
+	echo 'no need for release to npm'
 fi
 
 # @todo consider making this its own script
@@ -140,39 +140,39 @@ fi
 if test -n "${BEVRY_CDN_TOKEN-}"; then
 	echo 'publishing to bevry cdn...'
 
-	echo "prepping for cdn..."
+	echo 'prepping for cdn...'
 	f="./.npmignore"
 	n="$(mktemp)"
 	o="$(mktemp)"
-	node -e "process.stdout.write(require('fs').readFileSync('$f', 'utf8').replace(/# [-=\s]+# CDN Inclusions.+?[^#][^ ][^-=]+/, ''))" > "$n"
+	node -e "process.stdout.write(require('fs').readFileSync('$f', 'utf8').replace(/# [-=\s]+# CDN Inclusions.+?[^#][^ ][^-=]+/, ''))" >"$n"
 	mv "$f" "$o"
 	mv "$n" "$f"
 
-	echo "versioning for cdn..."
+	echo 'versioning for cdn...'
 	tag="cdn"
 	version="$(node -e "process.stdout.write(require('./package.json').version)")"
 	time="$(date +%s)"
-	cdn="${version%-*}-${tag}.${time}.${REPO_JOB_ID}"  # version trims anything after -
+	cdn="${version%-*}-${tag}.${time}.${REPO_JOB_ID}" # version trims anything after -
 	npm version "${cdn}" --git-tag-version=false
 
 	echo "publishing to tag ${tag} with version ${cdn}..."
 	npm_publish --access public --tag "${tag}"
 
-	echo "adding cdn aliases..."
+	echo 'adding cdn aliases...'
 	packageName="$(node -e "process.stdout.write(require('./package.json').name)")"
 	target="${packageName}@${cdn}"
 
 	if test -n "${REPO_BRANCH-}"; then
 		echo "aliasing $REPO_NAME/$REPO_BRANCH to ${target}"
-		curl -d "alias=$REPO_NAME/$REPO_BRANCH" -d "target=${target}" -d "token=${BEVRY_CDN_TOKEN}" https://cdn.bevry.me
+		curl -d "alias=$REPO_NAME/$REPO_BRANCH" -d "target=${target}" -d "token=${BEVRY_CDN_TOKEN}" 'https://cdn.bevry.me'
 	fi
 	if test -n "${REPO_TAG-}"; then
 		echo "aliasing $REPO_NAME/$REPO_TAG to ${target}"
-		curl -d "alias=$REPO_NAME/$REPO_TAG" -d "target=${target}" -d "token=${BEVRY_CDN_TOKEN}" https://cdn.bevry.me
+		curl -d "alias=$REPO_NAME/$REPO_TAG" -d "target=${target}" -d "token=${BEVRY_CDN_TOKEN}" 'https://cdn.bevry.me'
 	fi
 	if test -n "${REPO_COMMIT-}"; then
 		echo "aliasing $REPO_NAME/$REPO_COMMIT to ${target}"
-		curl -d "alias=$REPO_NAME/$REPO_COMMIT" -d "target=${target}" -d "token=${BEVRY_CDN_TOKEN}" https://cdn.bevry.me
+		curl -d "alias=$REPO_NAME/$REPO_COMMIT" -d "target=${target}" -d "token=${BEVRY_CDN_TOKEN}" 'https://cdn.bevry.me'
 	fi
 
 	echo 'resetting cdn changes...'
